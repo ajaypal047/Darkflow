@@ -107,7 +107,6 @@ def postprocess(self, net_out, im, save = True, check = False):
 		max_indx = np.argmax(b.probs)
 		max_prob = b.probs[max_indx]
 		label = self.meta['labels'][max_indx]
-		print("labels",label)
 		if max_prob > _thresh.get(label,threshold):
 			left  = int ((b.x - b.w/2.) * w)
 			right = int ((b.x + b.w/2.) * w)

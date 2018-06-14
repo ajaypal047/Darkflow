@@ -37,7 +37,7 @@ def parse(self, exclusive = False):
         exit('Error: {}'.format(msg.format(ann)))
     print('\n{} parsing {}'.format(meta['model'], ann))
     #dumps = pascal_voc_clean_xml(ann, meta['labels'], exclusive)
-    dumps = udacity_voc_csv(ann, meta['labels'], exclusive)
+    dumps = udacity_voc_csv('/Users/claw/Downloads/darkflow/images/train/labels.csv', meta['labels'], exclusive)
 
     save_to = os.path.join('net', 'yolo', meta['name'])
     while True:
