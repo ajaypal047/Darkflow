@@ -1,1 +1,2 @@
 net/yolo/tiny-yolov1-5c.parsed car cat dog person horse
+net/yolo/tiny-yolov1-5c_.parsed car trafficLight truck pedestrian biker

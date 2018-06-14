@@ -23,6 +23,7 @@ def udacity_voc_csv(ANN, pick, exclusive = False):
     def _int(literal): # for literals supposed to be int 
         return int(float(literal))
     
+    #print("ann", ANN)
     dumps = list()
 
     csv_fname = os.path.join(ANN)

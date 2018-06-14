@@ -5,6 +5,7 @@ import os
 #from scipy.special import expit
 from utils.box import BoundBox, box_iou, prob_compare
 from utils.box import prob_compare2, box_intersection
+import json
 	
 _thresh = dict({
 	'person': .2,
@@ -69,6 +70,7 @@ def postprocess(self, net_out, im, save = True, check= False):
 		imgcv = cv2.imread(im)
 	else: imgcv = im
 	h, w, _ = imgcv.shape
+	resultsForJSON = []	
 	for b in boxes:
 		max_indx = np.argmax(b.probs)
 		max_prob = b.probs[max_indx]
@@ -84,14 +86,27 @@ def postprocess(self, net_out, im, save = True, check= False):
 			if top   < 0    :   top = 0
 			if bot   > h - 1:   bot = h - 1
 			thick = int((h+w)/300)
+			mess = '{}'.format(label)
+			#print(("label", mess, "confidence", max_prob, "topleft ","x ", left, "y ", top, "bottomright", " x",  right, "y", bot))
+			if self.FLAGS.json:
+				resultsForJSON.append({"label": mess, "confidence": float('%.2f' % max_prob), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
+				continue
 			cv2.rectangle(imgcv, 
 				(left, top), (right, bot), 
 				colors[max_indx], thick)
-			mess = '{}'.format(label)
 			cv2.putText(imgcv, mess, (left, top - 12), 
 				0, 1e-3 * h, colors[max_indx],thick//3)
 
-	if not save: return imgcv
 	outfolder = os.path.join(self.FLAGS.test, 'out') 
 	img_name = os.path.join(outfolder, im.split('/')[-1])
+	if(check==False):
+		if self.FLAGS.json:
+			textJSON = json.dumps(resultsForJSON)
+			textFile = os.path.splitext(img_name)[0] + ".json"
+			with open(textFile, 'w') as f:
+				f.write(textJSON)
+			return	
+
+	if not save: return imgcv
+	
 	cv2.imwrite(img_name, imgcv)

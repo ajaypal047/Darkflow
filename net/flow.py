@@ -6,6 +6,9 @@ import pickle
 from copy import deepcopy
 from numpy.random import permutation as perm
 from utils.udacity_voc_csv import udacity_voc_csv
+from utils.box import BoundBox, box_iou, prob_compare
+from utils.box import prob_compare2, box_intersection
+from collections import OrderedDict
 
 train_stats = (
     'Training statistics: \n'
@@ -68,117 +71,91 @@ def train(self):
         ckpt = (i+1) % 10 #(self.FLAGS.save // self.FLAGS.batch)
         args = [step_now, profile]
         if not ckpt: _save_ckpt(self, *args)
-       
-        if i%2==0:
+        
+        if not ckpt:
+            boxe=list()
+            w = 1920
+            h = 1200
             print("====================================")
             boxes = val(self)
-            eval_list(self.FLAGS.val,boxes)
+            figu= udacity_voc_csv(self.FLAGS.valAnn,self.meta['labels'],True)
+            p=0
+            for box in boxes:
+                for b in box[1][0]:
+                    k = b.probs
+                    #print("boxes = self.x ", b.x, "self.y ", b.y, "self.w ", b.w,  "self.h ", b.h , "Class names ", self.meta['labels'][np.argmax(k)], "prob =", k)
+                    boxe+=[[boxes[p][0],[w,h,[[self.meta['labels'][np.argmax(k)], b.x, b.y, b.w, b.h]]]]]
+                p=p+1
 
-            #self.val_writer.add_summary(fetched[1], loss_)
+            eval_list(boxe,self)
 
-    #if ckpt: _save_ckpt(self, *args)
 
-def eval_list(boxes):
-    inp_path = self.FLAGS.val
-    all_inp_ = os.listdir(inp_path)
-    all_inp_ = [i for i in all_inp_ if self.framework.is_inp(i)]
+
+def eval_list(boxes,self):
+    actuals = udacity_voc_csv(self.FLAGS.valAnn,self.meta['labels'])
+    names = list()
+    for box in actuals:
+        names.append(box[0])
+
+    imgName = list(OrderedDict.fromkeys(names))
 
     conf_thresh = 0.25
     nms_thresh = 0.4
     iou_thresh = 0.5
     min_box_scale = 8. / 448
 
-    with open(self.FLAGS.valANN) as fp:
-        lines = fp.readlines()
-
     total = 0.0
     proposals = 0.0
     correct = 0.0
     lineId = 0
     avg_iou = 0.0
-    imageName = ''
 
-    for line in lines:
-        img_path = line.rstrip()
-        imageName = image_path[0]
-        break;
+    groundBox = BoundBox(20)
+    prdiction = BoundBox(20)
 
-    for line in lines:
-        img_path = line.rstrip()
-        if img_path[0] == imageName:
-            truth[image][]
+    for names in imgName:
+        for boxgt in actuals:
+            if(names[1:] == boxgt[0][1:]):
+                total = total+1
+                best_iou = 0
+                for box in boxes:
+                    if(box[0]== boxgt[0][1:] and box[1][2][0][0]==boxgt[1][2][0][0]):
+                        proposals = proposals+1
+                        box_gt = boxgt[1][2][0][1:5]
+                        boxp = box[1][2][0][1:5]
+                        groundBox.x = (box_gt[2]+box_gt[0])/2
+                        groundBox.y = (box_gt[1]+box_gt[3])/2
+                        groundBox.w = (box_gt[2]-box_gt[0])
+                        groundBox.h = (box_gt[3]-box_gt[1])
+                        prdiction.x = (boxp[2]+boxp[0])/2
+                        prdiction.y = (boxp[1]+boxp[3])/2
+                        prdiction.w = (boxp[2]-boxp[0])
+                        prdiction.h = (boxp[3]-boxp[1])
+                        iou = box_iou(groundBox, prdiction)
+                        best_iou = max(iou, best_iou)
+                    
+                    if best_iou > iou_thresh:
+                        avg_iou += best_iou
+                        correct = correct+1
+        if(proposals==0):
+            precision = 0
+        else:
+            precision = 1.0*correct/proposals
 
+        recall = 1.0*correct/total
+        if(correct==0):
+            fscore = 0
+            IOU = 0
+        else:
+            fscore = 2.0*precision*recall/(precision+recall)
+            IOU = avg_iou/correct
+        proposals = 0
+        total = 0
+        print("Image no:",names[1:],"IOU: %f, Recal: %f, Precision: %f, Fscore: %f" % (IOU, recall, precision, fscore))
+        
 
+    
 
-        truths = read_truths_args(lab_path, min_box_scale)
-        total = total + truths.shape[0]
-
-
-    for i in range(len(boxes)):
-            proposals = proposals+1
-
-    for i in range(truths.shape[0]):
-        box_gt = [truths[i][1], truths[i][2], truths[i][3], truths[i][4], 1.0]
-        best_iou = 0
-        for j in range(len(boxes)):
-            iou = bbox_iou(box_gt, boxes[j], x1y1x2y2=False)
-            best_iou = max(iou, best_iou)
-        if best_iou > iou_thresh:
-            avg_iou += best_iou
-            correct = correct+1
-
-    precision = 1.0*correct/proposals
-    recall = 1.0*correct/total
-    fscore = 2.0*precision*recall/(precision+recall)
-    print("%d IOU: %f, Recal: %f, Precision: %f, Fscore: %f\n" % (lineId-1, avg_iou/correct, recall, precision, fscore))
-
-def read_truths(lab_path):
-    if os.path.getsize(lab_path):
-        truths = np.loadtxt(lab_path)
-        truths = truths.reshape(truths.size/5, 5) # to avoid single truth problem
-        return truths
-    else:
-        return np.array([])
-
-def read_truths_args(lab_path, min_box_scale):
-    truths = read_truths(lab_path)
-    new_truths = []
-    for i in range(truths.shape[0]):
-        if truths[i][3] < min_box_scale:
-            continue
-        new_truths.append([truths[i][0], truths[i][1], truths[i][2], truths[i][3], truths[i][4]])
-    return np.array(new_truths)
-
-def bbox_ious(boxes1, boxes2, x1y1x2y2=True):
-    if x1y1x2y2:
-        mx = np.min(boxes1[0], boxes2[0])
-        Mx = np.max(boxes1[2], boxes2[2])
-        my = np.min(boxes1[1], boxes2[1])
-        My = np.max(boxes1[3], boxes2[3])
-        w1 = boxes1[2] - boxes1[0]
-        h1 = boxes1[3] - boxes1[1]
-        w2 = boxes2[2] - boxes2[0]
-        h2 = boxes2[3] - boxes2[1]
-    else:
-        mx = np.min(boxes1[0]-boxes1[2]/2.0, boxes2[0]-boxes2[2]/2.0)
-        Mx = np.max(boxes1[0]+boxes1[2]/2.0, boxes2[0]+boxes2[2]/2.0)
-        my = np.min(boxes1[1]-boxes1[3]/2.0, boxes2[1]-boxes2[3]/2.0)
-        My = np.max(boxes1[1]+boxes1[3]/2.0, boxes2[1]+boxes2[3]/2.0)
-        w1 = boxes1[2]
-        h1 = boxes1[3]
-        w2 = boxes2[2]
-        h2 = boxes2[3]
-    uw = Mx - mx
-    uh = My - my
-    cw = w1 + w2 - uw
-    ch = h1 + h2 - uh
-    mask = ((cw <= 0) + (ch <= 0) > 0)
-    area1 = w1 * h1
-    area2 = w2 * h2
-    carea = cw * ch
-    carea[mask] = 0
-    uarea = area1 + area2 - carea
-    return carea/uarea
 
 def predict(self):
     inp_path = self.FLAGS.test
@@ -257,15 +234,16 @@ def val(self):
 
         self.say('Total time = {}s / {} inps = {} ips'.format(
             last, len(inp_feed), len(inp_feed) / last))
-
+        boxes1 = []
         self.say('Post processing {} inputs ...'.format(len(inp_feed)))
         start = time.time()
         for i, prediction in enumerate(out):
             boxes.append(self.framework.postprocess(prediction, os.path.join(inp_path, all_inp[i]),False, True))
+            boxes1.append([all_inp[i], boxes])
 
         stop = time.time(); last = stop - start
 
         self.say('Total time = {}s / {} inps = {} ips'.format(
             last, len(inp_feed), len(inp_feed) / last))
 
-        return boxes
+        return boxes1

@@ -1,5 +1,5 @@
 car 
-cat 
-dog
-person
-horse
+trafficLight 
+truck
+pedestrian
+biker

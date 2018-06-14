@@ -3,6 +3,7 @@ from utils.box import BoundBox, box_iou, prob_compare
 import numpy as np
 import cv2
 import os
+import json
 
 def _fix(obj, dims, scale, offs):
 	for i in range(1, 5):
@@ -102,7 +103,10 @@ def postprocess(self, net_out, im, save = True, check = False):
 	if type(im) is not np.ndarray:
 		imgcv = cv2.imread(im)
 	else: imgcv = im
+
 	h, w, _ = imgcv.shape
+	resultsForJSON = []
+
 	for b in boxes:
 		max_indx = np.argmax(b.probs)
 		max_prob = b.probs[max_indx]
@@ -119,10 +123,14 @@ def postprocess(self, net_out, im, save = True, check = False):
 
 			if(check==False):
 				thick = int((h + w) // 150)
+				mess = '{}'.format(label)
+				if self.FLAGS.json:
+					resultsForJSON.append({"label": mess, "confidence": float('%.2f' % max_prob), "topleft": {"x": left, "y": top}, "bottomright": {"x": right, "y": bot}})
+					continue
 				cv2.rectangle(imgcv, 
 					(left, top), (right, bot), 
 					self.meta['colors'][max_indx], thick)
-				mess = '{}'.format(label)
+				
 				cv2.putText(
 					imgcv, mess, (left, top - 12), 
 					0, 1e-3 * h, self.meta['colors'][max_indx],
@@ -135,6 +143,13 @@ def postprocess(self, net_out, im, save = True, check = False):
 				boxesReturn.append(b)
 	
 	if(check==False):
+		if self.FLAGS.json:
+			textJSON = json.dumps(resultsForJSON)
+			textFile = os.path.splitext(img_name)[0] + ".json"
+			with open(textFile, 'w') as f:
+				f.write(textJSON)
+			return	
+
 		if not save: return imgcv
 		outfolder = os.path.join(FLAGS.test, 'out') 
 		img_name = os.path.join(outfolder, im.split('/')[-1])
